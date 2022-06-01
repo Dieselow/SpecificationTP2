@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="booleans">
-    <CLASSES>
-      <root url="jar://$PROJECT_DIR$/booleans.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>
