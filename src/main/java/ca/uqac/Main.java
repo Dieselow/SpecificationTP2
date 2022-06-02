@@ -1,29 +1,20 @@
 package ca.uqac;
 
-import stev.booleans.Implies;
 import stev.booleans.Not;
 import stev.booleans.And;
 import stev.booleans.Or;
 import stev.booleans.BooleanFormula;
 import stev.booleans.PropositionalVariable;
 
-import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 
 import org.sat4j.core.VecInt;
 import org.sat4j.minisat.SolverFactory;
-import org.sat4j.reader.DimacsReader;
-import org.sat4j.reader.InstanceReader;
-import org.sat4j.reader.Reader;
 import org.sat4j.specs.ContradictionException;
 import org.sat4j.specs.IProblem;
 import org.sat4j.specs.ISolver;
 import org.sat4j.specs.TimeoutException;
-import org.sat4j.tools.ModelIterator;
 
 
 public class Main {
@@ -33,81 +24,6 @@ public class Main {
     public static void main(String[] args){
         // testSeb();
         SolveSudoku(SUDOKU);
-        //   rowConstraints();
-
-
-        System.out.println("Hello world");
-
-    }
-
-    public static void rowConstraints(){
-        BooleanFormula formula = null;
-        PropositionalVariable[] prop = createPropsLouis();
-        //displayArray(prop);
-        BooleanFormula fullFormula = null;
-
-        for(int j=0;j<9;j++){
-            formula = null;
-            Not startNot = null;
-            for (int i=0;i<8;i++){
-                if (startNot == null){
-                    startNot = new Not(prop[(i+1)*9+j]);
-                    continue;
-                }
-                else if(formula == null && startNot !=null){
-                    formula = new And(startNot,new Not(prop[(i+1)*9+j]));
-                }
-                else {
-                    formula = new And(formula,new Not(prop[(i+1)*9+j]));
-                }
-
-            }
-            //System.out.println(BooleanFormula.toCnf(formula).toString());
-            if(fullFormula == null){
-                fullFormula = new Implies(prop[j],formula);
-                System.out.println(fullFormula);
-            }
-            else {
-                fullFormula = new And(fullFormula,new Implies(prop[j],formula));
-            }
-        }
-
-       // System.out.println(BooleanFormula.toCnf(fullFormula).toString());
-
-    }
-
-    private static PropositionalVariable[] createPropsLouis(){
-        PropositionalVariable[] variablesProposition = new PropositionalVariable[9*9*9];
-        int row = 1;
-        int col = 1;
-        int num = 1;
-        for(int i=0;i<9*9*9;i++){
-            variablesProposition[i] = new PropositionalVariable(String.format("%d%d%d", row, col, num));
-            if(num == 9){
-                num=1;
-                col++;
-                if(col > 9){
-                    col = 1;
-                    row++;
-                }
-                continue;
-            }
-
-            num++;
-        }
-
-
-        return variablesProposition;
-    }
-
-    public static void displayArray(PropositionalVariable[] array){
-        for (int i = 0; i < array.length; i++) {
-            System.out.println(array[i]);
-        }
-    }
-    //Utils
-    public static Implies impliesNot(PropositionalVariable i, PropositionalVariable j){
-        return new Implies(i, new Not(j));
     }
 
     private static PropositionalVariable[][][] createVProps(){
@@ -126,9 +42,11 @@ public class Main {
         BooleanFormula booleanFormula = createFormula();
         System.out.println("Boolean formula in CNF format was successfully generated");
         int[][] clauses = booleanFormula.getClauses();
+        Map<Integer, String> associations = getInvertedAssociations(booleanFormula);
         ISolver solver = SolverFactory.newDefault();
         solver.newVar(9*9*9);
-        solver.setExpectedNumberOfClauses(clauses.length);
+        solver.setExpectedNumberOfClauses(clauses.length + getNumberOfConstraintsSudoku(sudoku));
+        solver = addPreFilledNumber(sudoku, solver, booleanFormula.getVariablesMap());
 
         for(int i=0; i<clauses.length; i++){
             try {
@@ -139,7 +57,7 @@ public class Main {
         }
 
         IProblem problem = solver;
-        Map<Integer, String> associations = getInvertedAssociations(booleanFormula);
+
 
         try {
             if (problem.isSatisfiable()) {
@@ -156,6 +74,43 @@ public class Main {
         } catch (TimeoutException e) {
             System.out.println(e);
         }
+    }
+
+    /*
+     * This method calculate the number of additionals constraint to the boolean formula
+     * based on the number pre-filled in the grid
+     */
+    private static int getNumberOfConstraintsSudoku(String sudoku){
+        int counter = 0;
+        for(int i=0; i<sudoku.length(); i++){
+            if(sudoku.charAt(i) != '#'){
+                counter++;
+            }
+        }
+        return counter;
+    }
+
+    private static ISolver addPreFilledNumber(String sudoku, ISolver solver, Map<String, Integer> associations){
+        // Iterate over the string representing the sudoku
+        for(int i=0; i<sudoku.length(); i++){
+            char c = sudoku.charAt(i);
+            // If we get something different than a # then it's a number pre-filled
+            if(c != '#'){
+                // We transform its index in the string as coordinate in the grid
+                int row = i/9;
+                int col = i%9;
+                // We get the associated integer for XXX propVar
+                int varNum = associations.get(String.format("%d%d%d", row, col, Character.getNumericValue(c)-1));
+                // We add a clause containing only the XXX propVar, so it must be True
+                try {
+                    solver.addClause(new VecInt(new int[]{varNum}));
+                } catch (ContradictionException e) {
+                    System.out.println(e);
+                    System.out.println("Sudoku grid is invalid");
+                }
+            }
+        }
+        return solver;
     }
 
     private static Map<Integer, String> getInvertedAssociations(BooleanFormula b){
@@ -203,7 +158,7 @@ public class Main {
                     for(int otherCol=0; otherCol<8; otherCol++){
                         andsCol[otherCol+1] = new Not(vProps[(otherCol+row+1)%9][col][num]);
                     }
-                    andsNum[row] = new And(andsCol);
+                    andsNum[col] = new And(andsCol);
                 }
                 orsCell[counter] = new Or(andsNum);
                 counter++;
@@ -310,10 +265,15 @@ public class Main {
                 }
                 // We create the Or condition for all possibility of one Cell of the sudoku
                 orsCell[counter] = new Or(andsCell);
-                // System.out.println(orsCell[counter]);
-                // System.out.println(BooleanFormula.toCnf(orsCell[counter]));
-                // System.exit(0);
                 counter++;
+
+                // BooleanFormula[] a = Arrays.asList(andsCell).subList(0, 2).toArray(new BooleanFormula[2]);
+                // BooleanFormula[] a2 = Arrays.asList(andsCell).subList(0, 3).toArray(new BooleanFormula[2]);
+                // Or b = new Or(a2);
+                // System.out.println(new Or(a2));
+                // new Scanner(System.in).nextLine();
+                // System.out.println(BooleanFormula.toCnf(new Or(a2)));
+                // new Scanner(System.in).nextLine();
             }
         }
         // We create the And condition to join all boolean formula of all cells
