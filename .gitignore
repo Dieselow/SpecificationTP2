@@ -3,3 +3,4 @@
 
 !/src/**/*.java
 !/booleans.jar
+!/org.sat4j.core.jar

@@ -7,14 +7,26 @@ import stev.booleans.Or;
 import stev.booleans.BooleanFormula;
 import stev.booleans.PropositionalVariable;
 
+import java.io.PrintWriter;
+
+import org.sat4j.core.VecInt;
+import org.sat4j.minisat.SolverFactory;
+import org.sat4j.reader.DimacsReader;
+import org.sat4j.reader.Reader;
+import org.sat4j.specs.ContradictionException;
+import org.sat4j.specs.IProblem;
+import org.sat4j.specs.ISolver;
+import org.sat4j.specs.TimeoutException;
+
+
 public class Main {
 
     public static String SUDOKU = "#26###81#3##7#8##64###5###7#5#1#7#9###39#51###4#3#2#5#1###3###15##2#4##9#38###46#";
 
     public static void main(String[] args){
-       createFormula();
+       SolveSudoku(SUDOKU);
         //   rowConstraints();
-       
+
 
         System.out.println("Hello world");
 
@@ -25,7 +37,7 @@ public class Main {
         PropositionalVariable[] prop = createPropsLouis();
         //displayArray(prop);
         BooleanFormula fullFormula = null;
-        
+
         for(int j=0;j<9;j++){
             formula = null;
             Not startNot = null;
@@ -40,7 +52,7 @@ public class Main {
                 else {
                     formula = new And(formula,new Not(prop[(i+1)*9+j]));
                 }
-            
+
             }
             //System.out.println(BooleanFormula.toCnf(formula).toString());
             if(fullFormula == null){
@@ -53,7 +65,7 @@ public class Main {
         }
 
        // System.out.println(BooleanFormula.toCnf(fullFormula).toString());
-        
+
     }
 
     private static PropositionalVariable[] createPropsLouis(){
@@ -72,14 +84,14 @@ public class Main {
                 }
                 continue;
             }
-        
+
             num++;
         }
-                    
-    
+
+
         return variablesProposition;
     }
-    
+
     public static void displayArray(PropositionalVariable[] array){
         for (int i = 0; i < array.length; i++) {
             System.out.println(array[i]);
@@ -96,10 +108,42 @@ public class Main {
                 for(int col=0; col<9; col++){
                     for(int num=0; num<9; num++){
                         variablesProposition[row][col][num] = new PropositionalVariable(String.format("%d%d%d", row, col, num));
-                    } 
+                    }
                 }
             }
         return variablesProposition;
+    }
+
+    private static void SolveSudoku(String sudoku){
+        BooleanFormula booleanFormula = createFormula();
+        int[][] clauses = booleanFormula.getClauses();
+        ISolver solver = SolverFactory.newDefault();
+        solver.newVar(9*9*9);
+        solver.setExpectedNumberOfClauses(clauses.length);
+
+        for(int i=0; i<clauses.length; i++){
+            try {
+                solver.addClause(new VecInt(clauses[i]));
+            } catch (ContradictionException e) {
+                System.out.println(e);
+            }
+        }
+
+        IProblem problem = solver;
+        Reader reader = new DimacsReader(solver);
+        StringBuilder out = new StringBuilder();
+        try {
+            if (problem.isSatisfiable()) {
+                System.out.println("Problem is solvable");
+                // problem.model()[0].
+            } else {
+                System.out.println("Problem is not solvable");
+            }
+        } catch (TimeoutException e) {
+            System.out.println(e);
+        }
+
+
     }
 
     private static BooleanFormula createFormula(){
@@ -107,12 +151,12 @@ public class Main {
         BooleanFormula cond1 = createConditionOneNumberByCell(vProps);
         BooleanFormula cond2 = createConditionUniqueNumberByRow(vProps);
         BooleanFormula cond3 = createConditionUniqueNumberByCol(vProps);
-        BooleanFormula cond4 = createConditionUniqueNumberSubGrid(vProps);   
+        BooleanFormula cond4 = createConditionUniqueNumberSubGrid(vProps);
 
-        BooleanFormula fullFormula = new And(cond1, cond2, cond3, cond4);
+        And fullFormula = new And(cond1, cond2, cond3, cond4);
 
-        return fullFormula;
-            
+        return BooleanFormula.toCnf(fullFormula);
+
     }
 
     private static BooleanFormula createConditionUniqueNumberByRow(PropositionalVariable[][][] vProps){
@@ -132,17 +176,16 @@ public class Main {
                 fullCondition = new And(fullCondition, or_row);
             }
         }
-
         return BooleanFormula.toCnf(fullCondition);
     }
 
     private static BooleanFormula createConditionUniqueNumberByCol(PropositionalVariable[][][] vProps){
         And fullCondition = new And();
 
-        for(int row=0; row<9; row++){
-            for(int col=0; col<9; col++){
+        for(int col=0; col<9; col++){
+            for(int num=0; num<9; num++){
                 Or or_col = new Or();
-                for(int num=0; num<9; num++){
+                for(int row=0; row<9; row++){
                     And and_col = new And(vProps[row][col][num]);
                     for(int other_row=0; other_row<8; other_row++){
                         Not n = new Not(vProps[(other_row+row+1)%9][col][num]);
@@ -150,27 +193,43 @@ public class Main {
                     }
                     or_col = new Or(or_col, BooleanFormula.toCnf(and_col));
                 }
-                System.out.println(or_col);
-                System.exit(0);
                 fullCondition = new And(fullCondition, or_col);
             }
         }
-
         return BooleanFormula.toCnf(fullCondition);
     }
-    
+
     private static BooleanFormula createConditionUniqueNumberSubGrid(PropositionalVariable[][][] vProps){
         And fullCondition = new And();
 
-        for(int row=0; row<9; row++){
-            for(int num=0; num<9; num++){
-                And and_row = new And();
-                for(int col=0; col<9; col++){
-                    
+
+        for(int subGridRow=0; subGridRow<3; subGridRow++){
+            for(int subGridCol=0; subGridCol<3; subGridCol++){
+                for(int num=0; num<9; num++){
+                    Or or_grid = new Or();
+                    for(int row=0; row<3; row++){
+                        for(int col=0; col<3; col++){
+                            int real_row = subGridRow*3+row;
+                            int real_col = subGridCol*3+col;
+                            And and_grid = new And(vProps[real_row][real_col][num]);
+
+                            for(int other_row=0; other_row<3; other_row++){
+                                for(int other_col=0; other_col<3; other_col++){
+                                    int real_other_row = (row+ other_row + 1) %3 + subGridRow*3;
+                                    int real_other_col = (col+ other_col + 1) %3 + subGridCol*3;
+                                    if(real_other_col == real_col && real_other_row == real_row) continue;
+
+                                    Not n = new Not(vProps[real_other_row][real_other_col][num]);
+                                    and_grid = new And(and_grid, n);
+                                }
+                            }
+                            or_grid = new Or(or_grid, BooleanFormula.toCnf(and_grid));
+                        }
+                    }
+                    fullCondition = new And(fullCondition, or_grid);
                 }
             }
         }
-
         return BooleanFormula.toCnf(fullCondition);
     }
 
@@ -191,17 +250,12 @@ public class Main {
                         Not n = new Not(vProps[row][col][(otherNumber+num+1)%9]);
                         and_cell = new And(and_cell, n);
                     }
-                    // Implies cell = new Implies(vProps[row][col][num], BooleanFormula.toCnf(and_cell));
                     // We add the new boolean formula to the others with xor
                     or_cell = new Or(or_cell, and_cell);
                 }
-                // System.out.println(or_cell);
-                // System.out.println(BooleanFormula.toCnf(or_cell));
-                // System.exit(0);
                 fullCondition = new And(fullCondition, or_cell);
             }
         }
-    // System.out.println(BooleanFormula.toCnf(fullCondition));
     return BooleanFormula.toCnf(fullCondition);
     }
 }
