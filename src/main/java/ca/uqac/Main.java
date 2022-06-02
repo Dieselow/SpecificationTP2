@@ -8,15 +8,19 @@ import stev.booleans.BooleanFormula;
 import stev.booleans.PropositionalVariable;
 
 import java.io.PrintWriter;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.sat4j.core.VecInt;
 import org.sat4j.minisat.SolverFactory;
 import org.sat4j.reader.DimacsReader;
+import org.sat4j.reader.InstanceReader;
 import org.sat4j.reader.Reader;
 import org.sat4j.specs.ContradictionException;
 import org.sat4j.specs.IProblem;
 import org.sat4j.specs.ISolver;
 import org.sat4j.specs.TimeoutException;
+import org.sat4j.tools.ModelIterator;
 
 
 public class Main {
@@ -130,20 +134,39 @@ public class Main {
         }
 
         IProblem problem = solver;
-        Reader reader = new DimacsReader(solver);
-        StringBuilder out = new StringBuilder();
+        Map<Integer, String> associations = getInvertedAssociations(booleanFormula);
+
         try {
             if (problem.isSatisfiable()) {
                 System.out.println("Problem is solvable");
-                // problem.model()[0].
+                for (int var : problem.model()) {
+                    // Only get var that are true
+                    if (var > 0) {
+                        System.out.println(associations.get(var));
+                    }
+                  }
             } else {
                 System.out.println("Problem is not solvable");
             }
         } catch (TimeoutException e) {
             System.out.println(e);
         }
+    }
 
+    private static Map<Integer, String> getInvertedAssociations(BooleanFormula b){
+        Map<String,Integer> associations = b.getVariablesMap();
+        Map<Integer,String> invertedAssociations = new HashMap<Integer,String>();
+        String s = null;
 
+        for(int row=0; row<9; row++){
+            for(int col=0; col<9; col++){
+                for(int num=0; num<9; num++){
+                    s = String.format("%d%d%d", row, col, num);
+                    invertedAssociations.put(associations.get(s), s);
+                }
+            }
+        }
+        return invertedAssociations;
     }
 
     private static BooleanFormula createFormula(){
@@ -151,7 +174,7 @@ public class Main {
         BooleanFormula cond1 = createConditionOneNumberByCell(vProps);
         BooleanFormula cond2 = createConditionUniqueNumberByRow(vProps);
         BooleanFormula cond3 = createConditionUniqueNumberByCol(vProps);
-        BooleanFormula cond4 = createConditionUniqueNumberSubGrid(vProps);
+        BooleanFormula cond4 = createConditionUniqueNumberBySubGrid(vProps);
 
         And fullFormula = new And(cond1, cond2, cond3, cond4);
 
@@ -162,6 +185,7 @@ public class Main {
     private static BooleanFormula createConditionUniqueNumberByRow(PropositionalVariable[][][] vProps){
         And fullCondition = new And();
 
+        // Similar but adapted from createConditionOneNumberByCell
         for(int row=0; row<9; row++){
             for(int num=0; num<9; num++){
                 Or or_row = new Or();
@@ -182,6 +206,7 @@ public class Main {
     private static BooleanFormula createConditionUniqueNumberByCol(PropositionalVariable[][][] vProps){
         And fullCondition = new And();
 
+        // Similar but adapted from createConditionOneNumberByCell
         for(int col=0; col<9; col++){
             for(int num=0; num<9; num++){
                 Or or_col = new Or();
@@ -199,12 +224,15 @@ public class Main {
         return BooleanFormula.toCnf(fullCondition);
     }
 
-    private static BooleanFormula createConditionUniqueNumberSubGrid(PropositionalVariable[][][] vProps){
+    private static BooleanFormula createConditionUniqueNumberBySubGrid(PropositionalVariable[][][] vProps){
         And fullCondition = new And();
 
-
+        // These loops divide the sudoku grid in subgrid of 3x3
+        // It iterate through each cell of the subgrid to create
+        // the required constraints for the boolean formula
         for(int subGridRow=0; subGridRow<3; subGridRow++){
             for(int subGridCol=0; subGridCol<3; subGridCol++){
+                // For each number we iterate all cells of the subgrid
                 for(int num=0; num<9; num++){
                     Or or_grid = new Or();
                     for(int row=0; row<3; row++){
@@ -213,6 +241,8 @@ public class Main {
                             int real_col = subGridCol*3+col;
                             And and_grid = new And(vProps[real_row][real_col][num]);
 
+                            // We iterate a second time the subgrid to add that if the number is set in one cell
+                            // Then it must be not set on all other cells of the subgrid
                             for(int other_row=0; other_row<3; other_row++){
                                 for(int other_col=0; other_col<3; other_col++){
                                     int real_other_row = (row+ other_row + 1) %3 + subGridRow*3;
