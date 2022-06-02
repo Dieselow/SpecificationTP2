@@ -7,22 +7,16 @@ import stev.booleans.Or;
 import stev.booleans.BooleanFormula;
 import stev.booleans.PropositionalVariable;
 
-import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+
 import java.util.Map;
 
 import org.sat4j.core.VecInt;
 import org.sat4j.minisat.SolverFactory;
-import org.sat4j.reader.DimacsReader;
-import org.sat4j.reader.InstanceReader;
-import org.sat4j.reader.Reader;
 import org.sat4j.specs.ContradictionException;
 import org.sat4j.specs.IProblem;
 import org.sat4j.specs.ISolver;
 import org.sat4j.specs.TimeoutException;
-import org.sat4j.tools.ModelIterator;
 
 
 public class Main {
@@ -30,83 +24,10 @@ public class Main {
     public static String SUDOKU = "#26###81#3##7#8##64###5###7#5#1#7#9###39#51###4#3#2#5#1###3###15##2#4##9#38###46#";
 
     public static void main(String[] args){
-        // testSeb();
-        SolveSudoku(SUDOKU);
-        //   rowConstraints();
+        //SolveSudoku(SUDOKU);
 
+     
 
-        System.out.println("Hello world");
-
-    }
-
-    public static void rowConstraints(){
-        BooleanFormula formula = null;
-        PropositionalVariable[] prop = createPropsLouis();
-        //displayArray(prop);
-        BooleanFormula fullFormula = null;
-
-        for(int j=0;j<9;j++){
-            formula = null;
-            Not startNot = null;
-            for (int i=0;i<8;i++){
-                if (startNot == null){
-                    startNot = new Not(prop[(i+1)*9+j]);
-                    continue;
-                }
-                else if(formula == null && startNot !=null){
-                    formula = new And(startNot,new Not(prop[(i+1)*9+j]));
-                }
-                else {
-                    formula = new And(formula,new Not(prop[(i+1)*9+j]));
-                }
-
-            }
-            //System.out.println(BooleanFormula.toCnf(formula).toString());
-            if(fullFormula == null){
-                fullFormula = new Implies(prop[j],formula);
-                System.out.println(fullFormula);
-            }
-            else {
-                fullFormula = new And(fullFormula,new Implies(prop[j],formula));
-            }
-        }
-
-       // System.out.println(BooleanFormula.toCnf(fullFormula).toString());
-
-    }
-
-    private static PropositionalVariable[] createPropsLouis(){
-        PropositionalVariable[] variablesProposition = new PropositionalVariable[9*9*9];
-        int row = 1;
-        int col = 1;
-        int num = 1;
-        for(int i=0;i<9*9*9;i++){
-            variablesProposition[i] = new PropositionalVariable(String.format("%d%d%d", row, col, num));
-            if(num == 9){
-                num=1;
-                col++;
-                if(col > 9){
-                    col = 1;
-                    row++;
-                }
-                continue;
-            }
-
-            num++;
-        }
-
-
-        return variablesProposition;
-    }
-
-    public static void displayArray(PropositionalVariable[] array){
-        for (int i = 0; i < array.length; i++) {
-            System.out.println(array[i]);
-        }
-    }
-    //Utils
-    public static Implies impliesNot(PropositionalVariable i, PropositionalVariable j){
-        return new Implies(i, new Not(j));
     }
 
     private static PropositionalVariable[][][] createVProps(){
@@ -211,11 +132,12 @@ public class Main {
     private static BooleanFormula createConditionUniqueNumberByCol(PropositionalVariable[][][] vProps){
         And fullCondition = new And();
 
-        // Similar but adapted from createConditionOneNumberByCell
-        for(int col=0; col<9; col++){
-            for(int num=0; num<9; num++){
+        //HAVE ->  (000 & !100 & !200 & !300 & !400 & !500 & !600 & !700 & !800)) | (010
+        // WANT -> (000 & !100 & !200 & !300 & !400 & !500 & !600 & !700 & !800)) | (100 
+        for(int num=0; num<9; num++){
+            for(int row=0; row<9; row++){
                 Or or_col = new Or();
-                for(int row=0; row<9; row++){
+                for(int col=0; col<9; col++){
                     And and_col = new And(vProps[row][col][num]);
                     for(int other_row=0; other_row<8; other_row++){
                         Not n = new Not(vProps[(other_row+row+1)%9][col][num]);
