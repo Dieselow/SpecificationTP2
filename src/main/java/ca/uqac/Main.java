@@ -8,7 +8,9 @@ import stev.booleans.BooleanFormula;
 import stev.booleans.PropositionalVariable;
 
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.sat4j.core.VecInt;
@@ -28,7 +30,8 @@ public class Main {
     public static String SUDOKU = "#26###81#3##7#8##64###5###7#5#1#7#9###39#51###4#3#2#5#1###3###15##2#4##9#38###46#";
 
     public static void main(String[] args){
-       SolveSudoku(SUDOKU);
+        // testSeb();
+        SolveSudoku(SUDOKU);
         //   rowConstraints();
 
 
@@ -120,6 +123,7 @@ public class Main {
 
     private static void SolveSudoku(String sudoku){
         BooleanFormula booleanFormula = createFormula();
+        System.out.println("Boolean formula in CNF format was successfully generated");
         int[][] clauses = booleanFormula.getClauses();
         ISolver solver = SolverFactory.newDefault();
         solver.newVar(9*9*9);
@@ -177,6 +181,7 @@ public class Main {
         BooleanFormula cond4 = createConditionUniqueNumberBySubGrid(vProps);
 
         And fullFormula = new And(cond1, cond2, cond3, cond4);
+        System.out.println("Boolean formula is fully created, casting it to CNF...");
 
         return BooleanFormula.toCnf(fullFormula);
 
@@ -264,11 +269,12 @@ public class Main {
     }
 
     private static BooleanFormula createConditionOneNumberByCell(PropositionalVariable[][][] vProps){
-        And fullCondition = new And();
+        BooleanFormula[] ors_cell_cnf = new BooleanFormula[81];
+        int counter = 0;
 
         for(int row=0; row<9; row++){
             for(int col=0; col<9; col++){
-                Or or_cell = new Or();
+                BooleanFormula[] ands_cell_cnf = new And[9];
 
                 // Conditions -> Chaque case ne peut contenir qu’un seul chiffre
                 // This loop create (1 -2 -3 -4 -5 -6 -7 -8 -9) for each number in one cell
@@ -281,11 +287,15 @@ public class Main {
                         and_cell = new And(and_cell, n);
                     }
                     // We add the new boolean formula to the others with xor
-                    or_cell = new Or(or_cell, and_cell);
+                    ands_cell_cnf[num] = BooleanFormula.toCnf(and_cell);
                 }
-                fullCondition = new And(fullCondition, or_cell);
+                System.out.println(BooleanFormula.toCnf(new Or(ands_cell_cnf[0], ands_cell_cnf[1], ands_cell_cnf[2], ands_cell_cnf[3], ands_cell_cnf[4], ands_cell_cnf[5])));
+                System.exit(0);
+                ors_cell_cnf[counter] = new Or(ands_cell_cnf);
+                counter++;
             }
         }
-    return BooleanFormula.toCnf(fullCondition);
+        BooleanFormula fullCondition = new And(ors_cell_cnf);
+        return fullCondition;
     }
 }
