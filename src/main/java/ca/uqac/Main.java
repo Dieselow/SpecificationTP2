@@ -3,11 +3,14 @@ package ca.uqac;
 import stev.booleans.Not;
 import stev.booleans.And;
 import stev.booleans.Or;
+import stev.booleans.Implies;
 import stev.booleans.BooleanFormula;
 import stev.booleans.PropositionalVariable;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
 
 import org.sat4j.core.VecInt;
 import org.sat4j.minisat.SolverFactory;
@@ -22,7 +25,6 @@ public class Main {
     public static String SUDOKU = "#26###81#3##7#8##64###5###7#5#1#7#9###39#51###4#3#2#5#1###3###15##2#4##9#38###46#";
 
     public static void main(String[] args){
-        // testSeb();
         SolveSudoku(SUDOKU);
     }
 
@@ -38,7 +40,40 @@ public class Main {
         return variablesProposition;
     }
 
+    private static void printSudoku(String sudoku){
+        if(sudoku.length() != 81){
+            new Exception("Length of string representing sudoku must be 81");
+        }
+
+        for(int i=0; i<sudoku.length(); i++){
+            if(i != 0){
+                if(i%9 == 0){
+                    System.out.println();
+                }
+                // Print vertical bar every 3 cell
+                else if(i%3 == 0){
+                    System.out.print("|");
+                }
+
+            }
+            // Print a horizontal every 3 row
+            if(i/(9*3) > (i-1)/(9*3)){
+                System.out.println("--- --- --- ");
+            }
+
+            char c = sudoku.charAt(i);
+            if(c == '#'){
+                System.out.print(" ");
+            }
+            else{
+                System.out.print(c);
+            }
+        }
+        System.out.println();
+    }
+
     private static void SolveSudoku(String sudoku){
+        printSudoku(sudoku);
         BooleanFormula booleanFormula = createFormula();
         System.out.println("Boolean formula in CNF format was successfully generated");
         int[][] clauses = booleanFormula.getClauses();
@@ -53,21 +88,31 @@ public class Main {
                 solver.addClause(new VecInt(clauses[i]));
             } catch (ContradictionException e) {
                 System.out.println(e);
+                System.out.println(Arrays.toString(clauses[i]));
             }
         }
 
         IProblem problem = solver;
 
-
         try {
             if (problem.isSatisfiable()) {
                 System.out.println("Problem is solvable");
+                char[] sudokuResult = new char[81];
+                int i = 0;
                 for (int var : problem.model()) {
-                    // Only get var that are true
+                    // Only get numbers in cell
                     if (var > 0) {
-                        System.out.println(associations.get(var));
+                        // System.out.println(associations.get(var));
+                        // [0] -> row, [1] -> column, [2] -> number
+                        // We get each cell in order of the sudoku and only one
+                        // number is set in one cell so we can safely iterate
+                        // Without checking row and column of associations.get(var)
+                        int numInCell = Character.getNumericValue(associations.get(var).charAt(2));
+                        sudokuResult[i] =  Character.forDigit(numInCell+1, 10);
+                        i++;
                     }
-                  }
+                }
+                printSudoku(String.valueOf(sudokuResult));
             } else {
                 System.out.println("Problem is not solvable");
             }
@@ -143,59 +188,57 @@ public class Main {
     }
 
     private static BooleanFormula createConditionUniqueNumberByRow(PropositionalVariable[][][] vProps){
-        BooleanFormula[] orsCell = new BooleanFormula[81];
+        BooleanFormula[] andsRow = new BooleanFormula[81];
         int counter = 0;
 
         // Similar but adapted from createConditionOneNumberByCell
         for(int row=0; row<9; row++){
             for(int num=0; num<9; num++){
-                BooleanFormula[] andsNum = new And[9];
+                BooleanFormula[] impliesNum = new Implies[9];
 
                 for(int col=0; col<9; col++){
-                    BooleanFormula[] andsCol = new BooleanFormula[9];
-                    andsCol[0] = vProps[row][col][num];
+                    BooleanFormula[] andsCol = new Not[8];
 
                     for(int otherCol=0; otherCol<8; otherCol++){
-                        andsCol[otherCol+1] = new Not(vProps[(otherCol+row+1)%9][col][num]);
+                        andsCol[otherCol] = new Not(vProps[row][(otherCol+col+1)%9][num]);
                     }
-                    andsNum[col] = new And(andsCol);
+                    impliesNum[col] = new Implies(vProps[row][col][num] , new And(andsCol));
                 }
-                orsCell[counter] = new Or(andsNum);
+                andsRow[counter] = new Or(impliesNum);
                 counter++;
             }
         }
-        BooleanFormula fullCondition = new And(orsCell);
+        BooleanFormula fullCondition = new And(andsRow);
         return fullCondition;
     }
 
     private static BooleanFormula createConditionUniqueNumberByCol(PropositionalVariable[][][] vProps){
-        BooleanFormula[] orsCell = new BooleanFormula[81];
+        BooleanFormula[] andsCol = new BooleanFormula[81];
         int counter = 0;
 
         // Similar but adapted from createConditionOneNumberByCell
         for(int col=0; col<9; col++){
             for(int num=0; num<9; num++){
-                BooleanFormula[] andsNum = new And[9];
+                BooleanFormula[] impliesNum = new Implies[9];
 
                 for(int row=0; row<9; row++){
-                    BooleanFormula[] andsRow = new BooleanFormula[9];
-                    andsRow[0] = vProps[row][col][num];
+                    BooleanFormula[] andsRow = new Not[8];
 
                     for(int otherRow=0; otherRow<8; otherRow++){
-                        andsRow[otherRow+1] = new Not(vProps[(otherRow+row+1)%9][col][num]);
+                        andsRow[otherRow] = new Not(vProps[(otherRow+row+1)%9][col][num]);
                     }
-                    andsNum[row] = new And(andsRow);
+                    impliesNum[row] = new Implies(vProps[row][col][num] , new And(andsRow));
                 }
-                orsCell[counter] = new Or(andsNum);
+                andsCol[counter] = new And(impliesNum);
                 counter++;
             }
         }
-        BooleanFormula fullCondition = new And(orsCell);
+        BooleanFormula fullCondition = new And(andsCol);
         return fullCondition;
     }
 
     private static BooleanFormula createConditionUniqueNumberBySubGrid(PropositionalVariable[][][] vProps){
-        BooleanFormula[] orsCell = new BooleanFormula[81];
+        BooleanFormula[] andsSubGrid = new BooleanFormula[81];
         int counter = 0;
 
         // These loops divide the sudoku grid in subgrid of 3x3
@@ -205,17 +248,15 @@ public class Main {
             for(int subGridCol=0; subGridCol<3; subGridCol++){
                 // For each number we iterate all cells of the subgrid
                 for(int num=0; num<9; num++){
-                    BooleanFormula[] andsNum = new And[9];
-                    int andsNumCounter = 0;
+                    BooleanFormula[] impliesNum = new Implies[9];
+                    int impliesNumCounter = 0;
 
                     for(int row=0; row<3; row++){
                         for(int col=0; col<3; col++){
                             int realRow = subGridRow*3+row;
                             int realCol = subGridCol*3+col;
-                            int andsSubGridCounter = 0;
-                            BooleanFormula[] andsSubGrid = new BooleanFormula[9];
-                            andsSubGrid[andsSubGridCounter] = vProps[realRow][realCol][num];
-                            andsSubGridCounter++;
+                            int numSubGriddCounter = 0;
+                            BooleanFormula[] numSubGrid = new Not[8];
 
                             // We iterate a second time the subgrid to add that if the number is set in one cell
                             // Then it must be not set on all other cells of the subgrid
@@ -225,59 +266,54 @@ public class Main {
                                     int realOtherCol = (col+ otherCol + 1) %3 + subGridCol*3;
                                     if(realOtherCol == realCol && realOtherRow == realRow) continue;
 
-                                    andsSubGrid[andsSubGridCounter] = new Not(vProps[realOtherRow][realOtherCol][num]);
-                                    andsSubGridCounter++;
+                                    numSubGrid[numSubGriddCounter] = new Not(vProps[realOtherRow][realOtherCol][num]);
+                                    numSubGriddCounter++;
                                 }
                             }
-                            andsNum[andsNumCounter] = new And(andsSubGrid);
-                            andsNumCounter++;
+                            impliesNum[impliesNumCounter] = new Implies(vProps[realRow][realCol][num], new And(numSubGrid));
+                            impliesNumCounter++;
                         }
                     }
-                    orsCell[counter] = new Or(andsNum);
+                    andsSubGrid[counter] = new And(impliesNum);
                     counter++;
                 }
             }
         }
-        BooleanFormula fullCondition = new And(orsCell);
+        BooleanFormula fullCondition = new And(andsSubGrid);
         return fullCondition;
     }
 
     private static BooleanFormula createConditionOneNumberByCell(PropositionalVariable[][][] vProps){
-        BooleanFormula[] orsCell = new BooleanFormula[81];
+        BooleanFormula[] andsCell = new BooleanFormula[81];
         int counter = 0;
 
         for(int row=0; row<9; row++){
             for(int col=0; col<9; col++){
-                BooleanFormula[] andsCell = new And[9];
+                BooleanFormula[] impliesCell = new Implies[9];
+                BooleanFormula[] t = new PropositionalVariable[9];
 
                 // Conditions -> Chaque case ne peut contenir qu’un seul chiffre
                 // This loop create (1 -2 -3 -4 -5 -6 -7 -8 -9) for each number in one cell
                 for(int num=0; num<9; num++){
-                    BooleanFormula[] andsNum = new BooleanFormula[9];
-                    andsNum[0] = vProps[row][col][num];
+                    BooleanFormula[] andsNum = new Not[8];
+                    t[num] = vProps[row][col][num];
 
                     // iterate for each other numbers
                     for(int otherNumber=0; otherNumber<8; otherNumber++){
-                        andsNum[otherNumber+1] = new Not(vProps[row][col][(otherNumber+num+1)%9]);
+                        andsNum[otherNumber] = new Not(vProps[row][col][(otherNumber+num+1)%9]);
                     }
                     // We create the And condition (1 & !2 & !3 & !4 & !5 & !6 & !7 & !8 & !9) for one Cell of the Sudoku
-                    andsCell[num] = new And(andsNum);
+                    impliesCell[num] = new Implies(vProps[row][col][num], new And(andsNum));
                 }
                 // We create the Or condition for all possibility of one Cell of the sudoku
-                orsCell[counter] = new Or(andsCell);
+                andsCell[counter] = new And(new And(impliesCell), new Or(t));
+                // System.out.println(BooleanFormula.toCnf(orsCell[counter]));
+                // System.exit(0);
                 counter++;
-
-                // BooleanFormula[] a = Arrays.asList(andsCell).subList(0, 2).toArray(new BooleanFormula[2]);
-                // BooleanFormula[] a2 = Arrays.asList(andsCell).subList(0, 3).toArray(new BooleanFormula[2]);
-                // Or b = new Or(a2);
-                // System.out.println(new Or(a2));
-                // new Scanner(System.in).nextLine();
-                // System.out.println(BooleanFormula.toCnf(new Or(a2)));
-                // new Scanner(System.in).nextLine();
             }
         }
         // We create the And condition to join all boolean formula of all cells
-        BooleanFormula fullCondition = new And(orsCell);
+        BooleanFormula fullCondition = new And(andsCell);
         return fullCondition;
     }
 }
