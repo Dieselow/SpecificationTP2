@@ -10,7 +10,7 @@ import stev.booleans.PropositionalVariable;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Scanner;
+
 
 import org.sat4j.core.VecInt;
 import org.sat4j.minisat.SolverFactory;
@@ -22,10 +22,22 @@ import org.sat4j.specs.TimeoutException;
 
 public class Main {
 
-    public static String SUDOKU = "#26###81#3##7#8##64###5###7#5#1#7#9###39#51###4#3#2#5#1###3###15##2#4##9#38###46#";
+    public static String SUDOKU = "#26###81#3##7#8##64###5###7#5#1#7#9###39#51###4#3#2#5#2###3###15##2#4##9#38###46#";
 
-    public static void main(String[] args){
-        SolveSudoku(SUDOKU);
+    public static void main(String[] args) {
+        if(args.length != 1){
+            System.out.println("Usage: ./executable StringRepresentingSudokuProblem");
+            System.out.println("Example: ./executable #26###81#3##7#8##64###5###7#5#1#7#9###39#51###4#3#2#5#2###3###15##2#4##9#38###46#");
+            System.exit(0);
+        }
+
+        String sudoku = args[0];
+        if (sudoku.length() != 81){
+            System.out.println("Length of string representing sudoku must be 81");
+            System.exit(1);
+        }
+
+        SolveSudoku(sudoku);
     }
 
     private static PropositionalVariable[][][] createVProps(){
@@ -40,9 +52,10 @@ public class Main {
         return variablesProposition;
     }
 
-    private static void printSudoku(String sudoku){
+    private static void printSudoku(String sudoku) {
         if(sudoku.length() != 81){
-            new Exception("Length of string representing sudoku must be 81");
+            System.out.println("Length of string representing sudoku must be 81");
+            System.exit(1);
         }
 
         for(int i=0; i<sudoku.length(); i++){
@@ -64,24 +77,22 @@ public class Main {
             char c = sudoku.charAt(i);
             if(c == '#'){
                 System.out.print(" ");
-            }
-            else{
+            } else{
                 System.out.print(c);
             }
         }
         System.out.println();
     }
 
-    private static void SolveSudoku(String sudoku){
+    private static void SolveSudoku(String sudoku) {
         printSudoku(sudoku);
-        BooleanFormula booleanFormula = createFormula();
-        System.out.println("Boolean formula in CNF format was successfully generated");
-        int[][] clauses = booleanFormula.getClauses();
-        Map<Integer, String> associations = getInvertedAssociations(booleanFormula);
+        BooleanFormula sudokuRules = createFormula();
+        // System.out.println("Boolean formula in CNF format was successfully generated");
+        int[][] clauses = sudokuRules.getClauses();
+        Map<Integer, String> associations = getInvertedAssociations(sudokuRules);
         ISolver solver = SolverFactory.newDefault();
         solver.newVar(9*9*9);
         solver.setExpectedNumberOfClauses(clauses.length + getNumberOfConstraintsSudoku(sudoku));
-        solver = addPreFilledNumber(sudoku, solver, booleanFormula.getVariablesMap());
 
         for(int i=0; i<clauses.length; i++){
             try {
@@ -92,6 +103,7 @@ public class Main {
             }
         }
 
+        solver = addPreFilledNumber(sudoku, solver, sudokuRules.getVariablesMap());
         IProblem problem = solver;
 
         try {
@@ -151,7 +163,7 @@ public class Main {
                     solver.addClause(new VecInt(new int[]{varNum}));
                 } catch (ContradictionException e) {
                     System.out.println(e);
-                    System.out.println("Sudoku grid is invalid");
+                    System.out.println("Sudoku grid seems invalid");
                 }
             }
         }
@@ -182,7 +194,7 @@ public class Main {
         BooleanFormula cond4 = createConditionUniqueNumberBySubGrid(vProps);
 
         And fullFormula = new And(cond1, cond2, cond3, cond4);
-        System.out.println("Boolean formula is fully created, casting it to CNF...");
+        // System.out.println("Boolean formula is fully created, casting it to CNF...");
 
         return BooleanFormula.toCnf(fullFormula);
     }
@@ -204,7 +216,7 @@ public class Main {
                     }
                     impliesNum[col] = new Implies(vProps[row][col][num] , new And(andsCol));
                 }
-                andsRow[counter] = new Or(impliesNum);
+                andsRow[counter] = new And(impliesNum);
                 counter++;
             }
         }
