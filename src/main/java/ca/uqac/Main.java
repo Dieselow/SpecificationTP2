@@ -22,6 +22,7 @@ import org.sat4j.specs.TimeoutException;
 
 public class Main {
 
+
     public static String SUDOKU = "#26###81#3##7#8##64###5###7#5#1#7#9###39#51###4#3#2#5#2###3###15##2#4##9#38###46#";
 
     public static void main(String[] args) {
