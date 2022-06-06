@@ -29,7 +29,7 @@ public class Main {
         if(args.length != 1){
             System.out.println("Usage: ./executable StringRepresentingSudokuProblem");
             System.out.println("Example: ./executable #26###81#3##7#8##64###5###7#5#1#7#9###39#51###4#3#2#5#2###3###15##2#4##9#38###46#");
-            System.exit(0);
+            System.exit(1);
         }
 
         String sudoku = args[0];
@@ -115,7 +115,6 @@ public class Main {
                 for (int var : problem.model()) {
                     // Only get numbers in cell
                     if (var > 0) {
-                        // System.out.println(associations.get(var));
                         // [0] -> row, [1] -> column, [2] -> number
                         // We get each cell in order of the sudoku and only one
                         // number is set in one cell so we can safely iterate
@@ -195,7 +194,6 @@ public class Main {
         BooleanFormula cond4 = createConditionUniqueNumberBySubGrid(vProps);
 
         And fullFormula = new And(cond1, cond2, cond3, cond4);
-        // System.out.println("Boolean formula is fully created, casting it to CNF...");
 
         return BooleanFormula.toCnf(fullFormula);
     }
@@ -320,8 +318,6 @@ public class Main {
                 }
                 // We create the Or condition for all possibility of one Cell of the sudoku
                 andsCell[counter] = new And(new And(impliesCell), new Or(t));
-                // System.out.println(BooleanFormula.toCnf(orsCell[counter]));
-                // System.exit(0);
                 counter++;
             }
         }
