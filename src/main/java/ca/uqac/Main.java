@@ -19,7 +19,10 @@ import org.sat4j.specs.IProblem;
 import org.sat4j.specs.ISolver;
 import org.sat4j.specs.TimeoutException;
 
-
+/**
+ * Made By Louis Dumont and Sebastien Mireau for the class 8INF958 at UQAC
+ * 
+ */
 public class Main {
 
 
